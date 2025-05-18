@@ -1,0 +1,47 @@
+{
+  "kind": "collectionType",
+  "collectionName": "specifications",
+  "info": {
+    "singularName": "specification",
+    "pluralName": "specifications",
+    "displayName": "Specification",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name",
+      "required": true
+    },
+    "fieldType": {
+      "type": "enumeration",
+      "enum": [
+        "number",
+        "string",
+        "boolean"
+      ]
+    },
+    "options": {
+      "type": "json"
+    },
+    "category": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::category.category",
+      "inversedBy": "specifications"
+    },
+    "product_specs": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::product-spec.product-spec",
+      "mappedBy": "specification"
+    }
+  }
+}

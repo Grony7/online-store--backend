@@ -1,0 +1,59 @@
+{
+  "kind": "collectionType",
+  "collectionName": "variants_color",
+  "info": {
+    "singularName": "variant-color",
+    "pluralName": "variants-color",
+    "displayName": "Variant color",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "color": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::color.color",
+      "inversedBy": "variant_colors"
+    },
+    "price": {
+      "type": "decimal",
+      "required": true
+    },
+    "sale_price": {
+      "type": "decimal"
+    },
+    "on_sale": {
+      "type": "boolean",
+      "default": false,
+      "required": false
+    },
+    "stock": {
+      "type": "integer",
+      "default": 0
+    },
+    "images": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos"
+      ]
+    },
+    "product": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::product.product",
+      "inversedBy": "variant_colors"
+    },
+    "order_items": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::order-item.order-item",
+      "mappedBy": "variant_color"
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "kind": "collectionType",
+  "collectionName": "product_specs",
+  "info": {
+    "singularName": "product-spec",
+    "pluralName": "product-specs",
+    "displayName": "Product spec",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "product": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::product.product",
+      "inversedBy": "product_specs"
+    },
+    "specification": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::specification.specification",
+      "inversedBy": "product_specs"
+    },
+    "value_string": {
+      "type": "string"
+    },
+    "value_number": {
+      "type": "integer"
+    },
+    "value_boolean": {
+      "type": "boolean"
+    }
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "kind": "collectionType",
+  "collectionName": "orders",
+  "info": {
+    "singularName": "order",
+    "pluralName": "orders",
+    "displayName": "Order"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "items": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::order-item.order-item",
+      "mappedBy": "order"
+    },
+    "total": {
+      "type": "decimal",
+      "required": true
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": [
+        "new",
+        "paid",
+        "shipped",
+        "completed",
+        "canceled"
+      ],
+      "default": "new"
+    },
+    "payment_method": {
+      "type": "enumeration",
+      "enum": [
+        "card",
+        "sbp",
+        "cash",
+        "online"
+      ],
+      "default": "online"
+    },
+    "delivery_method": {
+      "type": "enumeration",
+      "enum": ["pickup", "delivery"],
+      "required": true
+    },
+    "pickup_point": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::pickup-point.pickup-point",
+      "inversedBy": "orders"
+    },
+    "address": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::address.address",
+      "inversedBy": "orders"
+    },
+    "user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "orders"
+    }
+  }
+}

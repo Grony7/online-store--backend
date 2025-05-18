@@ -1,0 +1,28 @@
+{
+  "kind": "collectionType",
+  "collectionName": "colors",
+  "info": {
+    "singularName": "color",
+    "pluralName": "colors",
+    "displayName": "Color",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "hex_code": {
+      "type": "string"
+    },
+    "variant_colors": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::variant-color.variant-color",
+      "mappedBy": "color"
+    }
+  }
+}
