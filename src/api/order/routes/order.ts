@@ -22,6 +22,23 @@ export default {
     },
     {
       method: 'GET',
+      path: '/orders/payment/session/:session/status',
+      handler: 'order.getStatus',
+      config: {
+        auth: false
+      }
+    },
+    {
+      method: 'POST',
+      path: '/orders/payment/update-status',
+      handler: 'order.updatePaymentStatus',
+      config: {
+        auth: { public: false },
+        policies: [],
+      },
+    },
+    {
+      method: 'GET',
       path: '/orders/:id',
       handler: 'order.findOne',
       config: {
@@ -29,6 +46,6 @@ export default {
         policies: [],
         middlewares: [],
       },
-    },
+    }
   ],
 };

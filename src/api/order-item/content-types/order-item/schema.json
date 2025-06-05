@@ -4,38 +4,38 @@
   "info": {
     "singularName": "order-item",
     "pluralName": "order-items",
-    "displayName": "Order item",
-    "description": ""
+    "displayName": "OrderItem",
+    "description": "Элементы заказа"
   },
   "options": {
     "draftAndPublish": false
   },
   "attributes": {
+    "quantity": {
+      "type": "integer",
+      "required": true,
+      "min": 1
+    },
+    "price": {
+      "type": "decimal",
+      "required": true,
+      "min": 0
+    },
+    "variant": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::variant-color.variant-color"
+    },
+    "order": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::order.order"
+    },
     "product": {
       "type": "relation",
       "relation": "manyToOne",
       "target": "api::product.product",
       "inversedBy": "order_items"
-    },
-    "variant_color": {
-      "type": "relation",
-      "relation": "manyToOne",
-      "target": "api::variant-color.variant-color",
-      "inversedBy": "order_items"
-    },
-    "quantity": {
-      "type": "integer",
-      "required": true
-    },
-    "unit_price": {
-      "type": "decimal",
-      "required": true
-    },
-    "order": {
-      "type": "relation",
-      "relation": "manyToOne",
-      "target": "api::order.order",
-      "inversedBy": "items"
     }
   }
 }

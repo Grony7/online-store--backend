@@ -45,7 +45,6 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
         rating,
         comment,
       },
-      populate: ['user','product'],
     });
 
     // 4) прикрепляем медиа, если пришли файлы
@@ -63,11 +62,31 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
         });
     }
 
-    // 5) возвращаем уже с media
-    const result = await strapi.entityService.findOne(UID, review.id, {
-      populate: ['user','product','media'],
+    // 5) возвращаем только минимально необходимую информацию
+    const result: any = await strapi.entityService.findOne(UID, review.id, {
+      populate: {
+        media: {
+          fields: ['id', 'url', 'formats']
+        }
+      }
     });
-    return this.transformResponse(result);
+
+    const mediaFiles = result.media || [];
+
+    // Возвращаем только необходимые данные
+    return ctx.send({
+      data: {
+        id: review.id,
+        rating,
+        comment,
+        media: mediaFiles.map(media => ({
+          id: media.id,
+          url: media.url,
+          thumbnail: media.formats?.thumbnail?.url || media.url,
+          type: isMediaVideo(media.url) ? 'video' : 'image'
+        }))
+      }
+    });
   },
 
   // PUT /reviews/:id
@@ -126,17 +145,40 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
     ]));
 
     // 6) «Привязываем» ровно этот набор, старые отвязываются автоматически
-    const updated = await strapi.db.query(UID).update({
+    await strapi.db.query(UID).update({
       where: { id },
       data: {
         media: {
           set: finalIds.map((i) => ({ id: i })),
         },
       },
-      populate: ['user','product','media'],
     });
 
-    return this.transformResponse(updated);
+    // 7) Получаем и возвращаем только необходимые медиафайлы
+    const result: any = await strapi.entityService.findOne(UID, id, {
+      populate: {
+        media: {
+          fields: ['id', 'url', 'formats']
+        }
+      }
+    });
+
+    const mediaFiles = result.media || [];
+
+    // Возвращаем упрощенный ответ
+    return ctx.send({
+      data: {
+        id,
+        rating: rating !== undefined ? rating : existing.rating,
+        comment: comment !== undefined ? comment : existing.comment,
+        media: mediaFiles.map(media => ({
+          id: media.id,
+          url: media.url,
+          thumbnail: media.formats?.thumbnail?.url || media.url,
+          type: isMediaVideo(media.url) ? 'video' : 'image'
+        }))
+      }
+    });
   },
 
   // DELETE /reviews/:id
@@ -172,26 +214,120 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
       return ctx.badRequest('Invalid product id');
     }
 
-    // снова Query API, чтобы не мучиться с типами filters
-    const reviews = await strapi.db.query(UID).findMany({
+    // Получаем параметры пагинации
+    const {
+      page = '1',
+      pageSize = '10',
+      sort = 'createdAt:desc'
+    } = ctx.query as Record<string, string>;
+
+    const pageNum = Math.max(1, Number(page));
+    const limit = Math.max(1, Math.min(Number(pageSize), 50)); // Ограничиваем максимум 50 отзывов за раз
+    const offset = (pageNum - 1) * limit;
+
+    // Настраиваем сортировку
+    const [sortField, sortOrder] = (sort || 'createdAt:desc').split(':');
+    const orderBy = { [sortField]: sortOrder === 'asc' ? 'asc' : 'desc' };
+
+    // 1) Сначала получаем общую статистику по отзывам (без пагинации)
+    const allReviews = await strapi.db.query(UID).findMany({
       where: { product: productId },
-      populate: ['user', 'media'],
+      select: ['rating'],
     });
 
-    const count = reviews.length;
-    const avg =
-      count > 0
-        ? reviews.reduce((sum, r: any) => sum + r.rating, 0) / count
-        : 0;
-
-    return ctx.send({
-      data: {
-        reviews,
-        stats: {
-          averageRating: Number(avg.toFixed(2)),
-          reviewsCount: count,
+    const totalCount = allReviews.length;
+    const avgRating = totalCount > 0
+      ? Number((allReviews.reduce((sum, r: any) => sum + r.rating, 0) / totalCount).toFixed(1))
+      : 0;
+    
+    // 2) Затем получаем только нужные отзывы с пагинацией и ограниченными данными
+    const reviews = await strapi.db.query(UID).findMany({
+      where: { product: productId },
+      select: ['rating', 'comment', 'createdAt', 'updatedAt'],
+      populate: {
+        user: {
+          select: ['id', 'username', 'email'],
+        },
+        media: {
+          select: ['url', 'width', 'height', 'formats'],
         },
       },
+      orderBy,
+      limit,
+      offset,
+    });
+
+    // 3) Получаем профили пользователей с аватарками
+    const userIds = reviews.map(review => review.user.id);
+    const userProfiles = userIds.length > 0 ? await strapi.db.query('api::user-profile.user-profile').findMany({
+      where: {
+        user: { id: { $in: userIds } }
+      },
+      populate: {
+        avatar: {
+          select: ['url', 'formats'],
+        },
+        user: {
+          select: ['id'],
+        },
+      },
+    }) : [];
+
+    // Создаем мапу профилей по user id
+    const profileMap = new Map();
+    userProfiles.forEach(profile => {
+      profileMap.set(profile.user.id, profile);
+    });
+
+    // 4) Форматируем ответ с оптимизацией данных и разделением на фото и видео
+    const formattedReviews = reviews.map(review => {
+      // Определяем тип медиафайла по расширению
+      const mediaWithType = review.media ? review.media.map(media => {
+        const url = media.url;
+        const fileExtension = url.split('.').pop()?.toLowerCase() || '';
+        const isVideo = ['mp4', 'webm', 'mov', 'avi', 'mkv'].includes(fileExtension);
+        
+        return {
+          url: url,
+          thumbnail: media.formats?.thumbnail?.url || media.url,
+          type: isVideo ? 'video' : 'image',
+          // Добавляем информацию о размере, если доступна
+          width: media.width || null,
+          height: media.height || null,
+        };
+      }) : [];
+      
+      const userProfile = profileMap.get(review.user.id);
+      
+      return {
+        id: review.id,
+        rating: review.rating,
+        comment: review.comment,
+        createdAt: review.createdAt,
+        updatedAt: review.updatedAt,
+        user: {
+          id: review.user.id,
+          username: review.user.username,
+          avatar: userProfile?.avatar ? {
+            url: userProfile.avatar.url,
+          } : null,
+        },
+        media: mediaWithType,
+      };
+    });
+
+    return ctx.send({
+        reviews: formattedReviews,
+        stats: {
+          averageRating: avgRating,
+          reviewsCount: totalCount,
+        },
+        pagination: {
+          page: pageNum,
+          pageSize: limit,
+          pageCount: Math.ceil(totalCount / limit),
+          total: totalCount,
+        },
     });
   },
 
@@ -253,17 +389,40 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
     ]));
 
     // 7) применяем replace media через Query API
-    const updated = await strapi.db.query(UID).update({
+    await strapi.db.query(UID).update({
       where: { id: existing.id },
       data: {
         media: {
           set: finalIds.map((i) => ({ id: i })),
         },
       },
-      populate: ['user', 'product', 'media'],
     });
 
-    return this.transformResponse(updated);
+    // 8) Получаем и возвращаем только необходимые медиафайлы
+    const result: any = await strapi.entityService.findOne(UID, existing.id, {
+      populate: {
+        media: {
+          fields: ['id', 'url', 'formats']
+        }
+      }
+    });
+
+    const mediaFiles = result.media || [];
+
+    // Возвращаем упрощенный ответ
+    return ctx.send({
+      data: {
+        id: existing.id,
+        rating: rating !== undefined ? rating : existing.rating,
+        comment: comment !== undefined ? comment : existing.comment,
+        media: mediaFiles.map(media => ({
+          id: media.id,
+          url: media.url,
+          thumbnail: media.formats?.thumbnail?.url || media.url,
+          type: isMediaVideo(media.url) ? 'video' : 'image'
+        }))
+      }
+    });
   },
 
   async deleteByProduct(ctx: Context) {
@@ -305,3 +464,9 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
     return this.transformResponse(deleted);
   },
 }));
+
+// Вспомогательная функция для определения типа медиафайла
+function isMediaVideo(url: string): boolean {
+  const fileExtension = url.split('.').pop()?.toLowerCase() || '';
+  return ['mp4', 'webm', 'mov', 'avi', 'mkv'].includes(fileExtension);
+}

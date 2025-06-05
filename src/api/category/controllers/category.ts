@@ -18,12 +18,12 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
       // Query API кладёт media сразу в cat.image (не в cat.image.data)
       const img = cat.image;
       return {
-        id:   cat.id,
+        id: cat.id,
         name: cat.name,
         slug: cat.slug,
         image: img
           ? {
-            url:  img.url,
+            url: img.url,
             name: img.name,
           }
           : null,
@@ -54,9 +54,21 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
         where: { product: { category: categoryId } },
         select: ['price', 'sale_price', 'on_sale'],
       });
-    const prices = variantColors.map(vc =>
-      vc.on_sale ? vc.sale_price : vc.price
-    );
+    
+    // Собираем все валидные цены
+    const prices = variantColors
+      .map(vc => {
+        // Если есть скидка и sale_price, используем sale_price
+        if (vc.on_sale && vc.sale_price !== null && vc.sale_price !== undefined) {
+          return vc.sale_price;
+        }
+        // Иначе используем обычную цену, если она есть
+        return vc.price;
+      })
+      // Фильтруем null, undefined и нулевые цены
+      .filter(price => price !== null && price !== undefined && price > 0);
+    
+    // Вычисляем min/max только если есть валидные цены
     const minPrice = prices.length ? Math.min(...prices) : 0;
     const maxPrice = prices.length ? Math.max(...prices) : 0;
 

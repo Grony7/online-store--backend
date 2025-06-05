@@ -4,65 +4,81 @@
   "info": {
     "singularName": "order",
     "pluralName": "orders",
-    "displayName": "Order"
+    "displayName": "Order",
+    "description": "Заказы пользователей"
   },
   "options": {
     "draftAndPublish": false
   },
   "attributes": {
-    "items": {
-      "type": "relation",
-      "relation": "oneToMany",
-      "target": "api::order-item.order-item",
-      "mappedBy": "order"
-    },
-    "total": {
-      "type": "decimal",
-      "required": true
+    "number": {
+      "type": "string",
+      "required": true,
+      "unique": true
     },
     "status": {
       "type": "enumeration",
       "enum": [
-        "new",
+        "pending",
+        "processing",
         "paid",
-        "shipped",
-        "completed",
-        "canceled"
+        "cancelled",
+        "failed",
+        "awaiting_payment"
       ],
-      "default": "new"
-    },
-    "payment_method": {
-      "type": "enumeration",
-      "enum": [
-        "card",
-        "sbp",
-        "cash",
-        "online"
-      ],
-      "default": "online"
-    },
-    "delivery_method": {
-      "type": "enumeration",
-      "enum": ["pickup", "delivery"],
+      "default": "pending",
       "required": true
     },
-    "pickup_point": {
-      "type": "relation",
-      "relation": "manyToOne",
-      "target": "api::pickup-point.pickup-point",
-      "inversedBy": "orders"
+    "total": {
+      "type": "decimal",
+      "required": true,
+      "min": 0
     },
-    "address": {
-      "type": "relation",
-      "relation": "manyToOne",
-      "target": "api::address.address",
-      "inversedBy": "orders"
+    "payment_session": {
+      "type": "string",
+      "unique": true
+    },
+    "payment_id": {
+      "type": "string",
+      "unique": true
     },
     "user": {
       "type": "relation",
       "relation": "manyToOne",
       "target": "plugin::users-permissions.user",
       "inversedBy": "orders"
+    },
+    "items": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::order-item.order-item",
+      "mappedBy": "order"
+    },
+    "delivery_method": {
+      "type": "enumeration",
+      "enum": [
+        "delivery",
+        "pickup"
+      ],
+      "required": true
+    },
+    "delivery_address": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::address.address"
+    },
+    "pickup_point": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::pickup-point.pickup-point"
+    },
+    "payment_method": {
+      "type": "enumeration",
+      "enum": [
+        "online",
+        "cash"
+      ],
+      "required": true
     }
   }
 }

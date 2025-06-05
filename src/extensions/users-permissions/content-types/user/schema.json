@@ -25,6 +25,12 @@
       "configurable": false,
       "required": true
     },
+    "name": {
+      "type": "string",
+      "minLength": 2,
+      "required": true,
+      "configurable": false
+    },
     "provider": {
       "type": "string",
       "configurable": false
@@ -87,6 +93,12 @@
       "type": "relation",
       "relation": "oneToMany",
       "target": "api::order.order",
+      "mappedBy": "user"
+    },
+    "favorites": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::favorite.favorite",
       "mappedBy": "user"
     }
   }

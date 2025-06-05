@@ -11,12 +11,6 @@
     "draftAndPublish": false
   },
   "attributes": {
-    "product": {
-      "type": "relation",
-      "relation": "manyToOne",
-      "target": "api::product.product",
-      "inversedBy": "product_specs"
-    },
     "specification": {
       "type": "relation",
       "relation": "manyToOne",
@@ -31,6 +25,12 @@
     },
     "value_boolean": {
       "type": "boolean"
+    },
+    "product": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::product.product",
+      "inversedBy": "product_specs"
     }
   }
 }
