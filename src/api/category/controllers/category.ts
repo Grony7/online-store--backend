@@ -31,7 +31,7 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
     });
 
     // 3) Отдаём результат
-    return ctx.send({ data });
+    return ctx.send(data);
   },
 
   async filters(ctx: Context) {
@@ -141,7 +141,7 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
 
     // 7) Отдаём всё вместе
     ctx.send({
-      data: {
+
         category: {
           id: category.id,
           name: category.name,
@@ -151,7 +151,7 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
           priceRange: { min: minPrice, max: maxPrice },
           specifications: specsFilters,
         },
-      },
+
     });
   },
 }));
