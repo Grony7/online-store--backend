@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админка чата поддержки</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+    background-color: #f8f9fa;
+  }
+
+  .admin-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  .admin-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  }
+
+  .admin-header h1 {
+    margin: 0;
+    font-size: 1.8rem;
+  }
+
+  .admin-header p {
+    margin: 5px 0 0 0;
+    opacity: 0.9;
+  }
+
+  .auth-section {
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+  }
+
+  .chat-interface {
+    display: grid;
+    grid-template-columns: 350px 1fr;
+    gap: 20px;
+    height: 700px;
+  }
+
+  .chats-panel {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .chats-header {
+    background: #f8f9fa;
+    padding: 20px;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .chats-list {
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .chat-item {
+    padding: 16px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  .chat-item:hover {
+    background-color: #f8f9fa;
+  }
+
+  .chat-item.active {
+    background-color: #e3f2fd;
+    border-left: 4px solid #2196f3;
+  }
+
+  .user-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .user-name {
+    font-weight: 600;
+    color: #333;
+  }
+
+  .last-time {
+    font-size: 0.8rem;
+    color: #666;
+  }
+
+  .last-message {
+    font-size: 0.9rem;
+    color: #666;
+    line-height: 1.3;
+  }
+
+  .chat-panel {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .chat-header {
+    background: #f8f9fa;
+    padding: 20px;
+    border-bottom: 1px solid #e0e0e0;
+  }
+
+  .messages-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    background-color: #f8f9fa;
+  }
+
+  .message {
+    margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .user-message {
+    align-items: flex-start;
+  }
+
+  .support-message {
+    align-items: flex-end;
+  }
+
+  .message-bubble {
+    max-width: 70%;
+    padding: 12px 16px;
+    border-radius: 18px;
+    word-wrap: break-word;
+  }
+
+  .user-message .message-bubble {
+    background: white;
+    color: #333;
+    border: 1px solid #e0e0e0;
+    border-bottom-left-radius: 6px;
+  }
+
+  .support-message .message-bubble {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-bottom-right-radius: 6px;
+  }
+
+  .message-time {
+    font-size: 0.75rem;
+    opacity: 0.7;
+    margin-top: 4px;
+    margin-left: 8px;
+    margin-right: 8px;
+  }
+
+  .chat-input {
+    padding: 20px;
+    border-top: 1px solid #e0e0e0;
+    background: white;
+  }
+
+  .input-form {
+    display: flex;
+    gap: 12px;
+    align-items: end;
+  }
+
+  .input-field {
+    flex: 1;
+  }
+
+  .input-field label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #333;
+  }
+
+  .input-field input, .input-field textarea {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .input-field input:focus, .input-field textarea:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+  }
+
+  .btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s;
+    font-size: 14px;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  }
+
+  .btn-secondary {
+    background: #f8f9fa;
+    color: #333;
+    border: 1px solid #ddd;
+  }
+
+  .btn-secondary:hover {
+    background: #e9ecef;
+  }
+
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .status-indicator {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 500;
+  }
+
+  .status-connected {
+    background-color: rgba(76, 175, 80, 0.2);
+    color: #4caf50;
+  }
+
+  .status-disconnected {
+    background-color: rgba(244, 67, 54, 0.2);
+    color: #f44336;
+  }
+
+  .loading {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+  }
+
+  .loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #e0e0e0;
+    border-top: 4px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 10px;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #666;
+  }
+
+  .empty-state svg {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+  }
+
+  .alert {
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+  }
+
+  .alert-error {
+    background-color: rgba(244, 67, 54, 0.1);
+    color: #d32f2f;
+    border: 1px solid rgba(244, 67, 54, 0.2);
+  }
+
+  .alert-warning {
+    background-color: rgba(255, 193, 7, 0.1);
+    color: #f57c00;
+    border: 1px solid rgba(255, 193, 7, 0.2);
+  }
+
+  @media (max-width: 768px) {
+    .chat-interface {
+      grid-template-columns: 1fr;
+      grid-template-rows: 300px 1fr;
+    }
+  }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const API_URL = 'http://localhost:1337';
+
+        const AdminChatApp = () => {
+            const [authToken, setAuthToken] = useState(localStorage.getItem('admin_chat_token') || '');
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
+            const [activeChats, setActiveChats] = useState([]);
+            const [selectedChat, setSelectedChat] = useState(null);
+            const [messages, setMessages] = useState([]);
+            const [newMessage, setNewMessage] = useState('');
+            const [socket, setSocket] = useState(null);
+            const [isConnected, setIsConnected] = useState(false);
+            const [isLoading, setIsLoading] = useState(false);
+            const [isLoadingChats, setIsLoadingChats] = useState(false);
+            const [error, setError] = useState(null);
+            const messagesEndRef = useRef(null);
+
+            // Автоскролл к последнему сообщению
+            const scrollToBottom = () => {
+                messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            };
+
+            // Проверка токена и инициализация
+            useEffect(() => {
+                if (authToken) {
+                    setIsAuthenticated(true);
+                    initializeChat();
+                }
+            }, [authToken]);
+
+            // Автоскролл при новых сообщениях
+            useEffect(() => {
+                scrollToBottom();
+            }, [messages]);
+
+            const initializeChat = () => {
+                loadActiveChats();
+                initializeWebSocket();
+            };
+
+            // Авторизация
+            const handleAuth = (e) => {
+                e.preventDefault();
+                if (authToken.trim()) {
+                    localStorage.setItem('admin_chat_token', authToken);
+                    setIsAuthenticated(true);
+                    initializeChat();
+                }
+            };
+
+            // Выход
+            const handleLogout = () => {
+                localStorage.removeItem('admin_chat_token');
+                setAuthToken('');
+                setIsAuthenticated(false);
+                if (socket) {
+                    socket.close();
+                }
+            };
+
+            // Загрузка списка активных чатов
+            const loadActiveChats = async () => {
+                try {
+                    setIsLoadingChats(true);
+                    setError(null);
+                    
+                    const response = await fetch(`${API_URL}/api/messages/chats/all`, {
+                        headers: {
+                            'Authorization': `Bearer ${authToken}`,
+                            'Content-Type': 'application/json',
+                        },
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log('Загружены активные чаты:', data);
+                        setActiveChats(data.data || []);
+                    } else {
+                        throw new Error(`Ошибка ${response.status}: ${response.statusText}`);
+                    }
+                } catch (error) {
+                    console.error('Ошибка загрузки чатов:', error);
+                    setError(`Ошибка загрузки чатов: ${error.message}`);
+                } finally {
+                    setIsLoadingChats(false);
+                }
+            };
+
+            // Загрузка истории сообщений для выбранного чата
+            const loadChatHistory = async (userId) => {
+                try {
+                    setIsLoading(true);
+                    setError(null);
+                    
+                    const response = await fetch(`${API_URL}/api/messages/user/${userId}`, {
+                        headers: {
+                            'Authorization': `Bearer ${authToken}`,
+                            'Content-Type': 'application/json',
+                        },
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log('Загружена история чата:', data);
+                        setMessages(data.data || []);
+                    } else {
+                        throw new Error(`Ошибка ${response.status}: ${response.statusText}`);
+                    }
+                } catch (error) {
+                    console.error('Ошибка загрузки истории чата:', error);
+                    setError(`Ошибка загрузки истории: ${error.message}`);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            // Инициализация WebSocket соединения
+            const initializeWebSocket = () => {
+                const newSocket = io(API_URL, {
+                    auth: { token: authToken },
+                    transports: ['websocket', 'polling']
+                });
+
+                newSocket.on('connect', () => {
+                    console.log('Подключение админа к WebSocket установлено');
+                    setIsConnected(true);
+                    setError(null);
+                });
+
+                newSocket.on('disconnect', () => {
+                    console.log('WebSocket соединение админа разорвано');
+                    setIsConnected(false);
+                });
+
+                newSocket.on('newMessage', (message) => {
+                    console.log('Получено новое сообщение в админке:', message);
+                    
+                    // Обновляем сообщения, если это активный чат
+                    if (selectedChat && message.userId === selectedChat.userId) {
+                        setMessages(prevMessages => [...prevMessages, message]);
+                    }
+                    
+                    // Обновляем список чатов
+                    loadActiveChats();
+                });
+
+                newSocket.on('connect_error', (error) => {
+                    console.error('Ошибка подключения WebSocket админки:', error);
+                    setError('Ошибка подключения к чату');
+                });
+
+                setSocket(newSocket);
+            };
+
+            // Выбор чата для просмотра
+            const selectChat = (chat) => {
+                setSelectedChat(chat);
+                loadChatHistory(chat.userId);
+                
+                // Присоединяемся к комнате пользователя через WebSocket
+                if (socket) {
+                    socket.emit('join', { userId: chat.userId });
+                }
+            };
+
+            // Отправка сообщения от поддержки
+            const sendSupportMessage = async (e) => {
+                e.preventDefault();
+                
+                if (!newMessage.trim() || !selectedChat || !isConnected) {
+                    return;
+                }
+
+                try {
+                    setError(null);
+                    
+                    const response = await fetch(`${API_URL}/api/messages/support/send`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${authToken}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            data: {
+                                targetUserId: selectedChat.userId,
+                                text: newMessage
+                            }
+                        }),
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log('Сообщение поддержки отправлено:', data);
+                        
+                        // Добавляем сообщение в локальное состояние
+                        const supportMessage = {
+                            ...data.data,
+                            isFromSupport: true
+                        };
+                        
+                        setMessages(prevMessages => [...prevMessages, supportMessage]);
+                        setNewMessage('');
+                        
+                        // Обновляем список чатов
+                        loadActiveChats();
+                    } else {
+                        throw new Error(`Ошибка ${response.status}: ${response.statusText}`);
+                    }
+                } catch (error) {
+                    console.error('Ошибка отправки сообщения поддержки:', error);
+                    setError(`Ошибка отправки: ${error.message}`);
+                }
+            };
+
+            // Принудительное обновление
+            const refreshChats = () => {
+                loadActiveChats();
+                if (selectedChat) {
+                    loadChatHistory(selectedChat.userId);
+                }
+            };
+
+            // Форматирование времени
+            const formatTime = (dateString) => {
+                return new Date(dateString).toLocaleString('ru-RU', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            };
+
+            if (!isAuthenticated) {
+                return (
+                    <div className="admin-container">
+                        <div className="admin-header">
+                            <h1>🎧 Админка чата поддержки</h1>
+                            <p>Для доступа введите JWT токен администратора</p>
+                        </div>
+                        
+                        <div className="auth-section">
+                            <form onSubmit={handleAuth}>
+                                <div className="input-field">
+                                    <label>JWT токен администратора:</label>
+                                    <input
+                                        type="password"
+                                        value={authToken}
+                                        onChange={(e) => setAuthToken(e.target.value)}
+                                        placeholder="Введите JWT токен..."
+                                        required
+                                    />
+                                </div>
+                                <button type="submit" className="btn btn-primary" style={{marginTop: '16px'}}>
+                                    Войти в систему
+                                </button>
+                            </form>
+                            
+                            <div style={{marginTop: '20px', padding: '16px', backgroundColor: '#f8f9fa', borderRadius: '8px'}}>
+                                <h4>Как получить токен:</h4>
+                                <ol>
+                                    <li>Войдите в админку Strapi</li>
+                                    <li>Откройте DevTools (F12)</li>
+                                    <li>Выполните: <code>localStorage.getItem('jwtToken')</code></li>
+                                    <li>Скопируйте полученный токен</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="admin-container">
+                    <div className="admin-header">
+                        <div>
+                            <h1>🎧 Админка чата поддержки</h1>
+                            <p>Управление обращениями пользователей</p>
+                        </div>
+                        <div style={{display: 'flex', gap: '12px', alignItems: 'center'}}>
+                            <span className={`status-indicator ${isConnected ? 'status-connected' : 'status-disconnected'}`}>
+                                {isConnected ? '✅ Подключено' : '❌ Не подключено'}
+                            </span>
+                            <button onClick={refreshChats} className="btn btn-secondary">
+                                🔄 Обновить
+                            </button>
+                            <button onClick={handleLogout} className="btn btn-secondary">
+                                🚪 Выйти
+                            </button>
+                        </div>
+                    </div>
+
+                    {error && (
+                        <div className="alert alert-error">
+                            <strong>Ошибка:</strong> {error}
+                        </div>
+                    )}
+
+                    <div className="chat-interface">
+                        {/* Левая панель - список чатов */}
+                        <div className="chats-panel">
+                            <div className="chats-header">
+                                <h3>Активные чаты</h3>
+                                <span className="status-indicator status-connected">
+                                    {activeChats.length}
+                                </span>
+                            </div>
+                            
+                            <div className="chats-list">
+                                {isLoadingChats ? (
+                                    <div className="loading">
+                                        <div className="loading-spinner"></div>
+                                        <p>Загрузка чатов...</p>
+                                    </div>
+                                ) : activeChats.length === 0 ? (
+                                    <div className="empty-state">
+                                        <p>💭 Нет активных чатов</p>
+                                        <p>Чаты появятся, когда пользователи начнут писать</p>
+                                    </div>
+                                ) : (
+                                    activeChats.map((chat) => (
+                                        <div
+                                            key={chat.userId}
+                                            className={`chat-item ${selectedChat?.userId === chat.userId ? 'active' : ''}`}
+                                            onClick={() => selectChat(chat)}
+                                        >
+                                            <div className="user-info">
+                                                <div className="user-name">
+                                                    👤 {chat.user?.username || chat.user?.email || `Пользователь ${chat.userId}`}
+                                                </div>
+                                                <div className="last-time">
+                                                    {formatTime(chat.lastMessageTime)}
+                                                </div>
+                                            </div>
+                                            
+                                            {chat.lastMessage && (
+                                                <div className="last-message">
+                                                    {chat.lastMessage.isFromSupport ? '👨‍💼 ' : '💬 '}
+                                                    {chat.lastMessage.text.length > 60 
+                                                        ? chat.lastMessage.text.substring(0, 60) + '...'
+                                                        : chat.lastMessage.text
+                                                    }
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Правая панель - чат */}
+                        <div className="chat-panel">
+                            {!selectedChat ? (
+                                <div className="empty-state">
+                                    <svg viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4l4 4 4-4h4c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
+                                    </svg>
+                                    <h3>Выберите чат для просмотра</h3>
+                                    <p>Выберите чат из списка слева для начала общения с пользователем</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="chat-header">
+                                        <h3>
+                                            💬 Чат с {selectedChat.user?.username || selectedChat.user?.email || `пользователем ${selectedChat.userId}`}
+                                        </h3>
+                                    </div>
+                                    
+                                    <div className="messages-container">
+                                        {isLoading ? (
+                                            <div className="loading">
+                                                <div className="loading-spinner"></div>
+                                                <p>Загрузка сообщений...</p>
+                                            </div>
+                                        ) : messages.length === 0 ? (
+                                            <div className="empty-state">
+                                                <p>📝 История сообщений пуста</p>
+                                                <p>Начните переписку с пользователем</p>
+                                            </div>
+                                        ) : (
+                                            messages.map((message) => (
+                                                <div
+                                                    key={message.id}
+                                                    className={`message ${message.isFromSupport ? 'support-message' : 'user-message'}`}
+                                                >
+                                                    <div className="message-bubble">
+                                                        <div>{message.text}</div>
+                                                    </div>
+                                                    <div className="message-time">
+                                                        {formatTime(message.createdAt)}
+                                                        {message.isFromSupport && ' • Поддержка'}
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                        <div ref={messagesEndRef} />
+                                    </div>
+
+                                    <div className="chat-input">
+                                        <form onSubmit={sendSupportMessage} className="input-form">
+                                            <div className="input-field">
+                                                <label>Ваш ответ пользователю:</label>
+                                                <textarea
+                                                    value={newMessage}
+                                                    onChange={(e) => setNewMessage(e.target.value)}
+                                                    placeholder="Введите ответ пользователю..."
+                                                    disabled={!isConnected}
+                                                    rows="2"
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                                            e.preventDefault();
+                                                            sendSupportMessage(e);
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
+                                            <button 
+                                                type="submit" 
+                                                className="btn btn-primary"
+                                                disabled={!isConnected || !newMessage.trim()}
+                                            >
+                                                📤 Отправить
+                                            </button>
+                                        </form>
+                                        
+                                        {!isConnected && (
+                                            <div className="alert alert-warning">
+                                                ⚠️ Соединение с чатом отсутствует. Попробуйте обновить страницу.
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(React.createElement(AdminChatApp), document.getElementById('root'));
+    </script>
+</body>
+</html> 

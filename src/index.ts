@@ -1,3 +1,4 @@
+import { initializeWebSocket } from './utils/websocket';
 // import type { Core } from '@strapi/strapi';
 
 export default {
@@ -16,7 +17,9 @@ export default {
    * This gives you an opportunity to set up your data model,
    * run jobs, or perform some special logic.
    */
-  bootstrap({ strapi }) {
+  async bootstrap({ strapi }) {
+    console.log('🚀 BOOTSTRAP: Запуск bootstrap функции...');
+    
     // Переопределяем email сервис
     strapi.eventHub.on('strapi::ready', () => {
       console.log('🔧 EMAIL-FIX: Переопределяем email сервис...');
@@ -43,5 +46,24 @@ export default {
       
       console.log('✅ EMAIL-FIX: Email сервис переопределен!');
     });
+
+    // Инициализация WebSocket - попробуем другой способ
+    console.log('🎯 WEBSOCKET-INIT: Настраиваем WebSocket инициализацию...');
+    
+    // Способ 1: Через event listener на HTTP сервер
+    const initWebSocketWhenReady = () => {
+      if (strapi.server?.httpServer) {
+        console.log('✅ HTTP сервер найден, инициализируем WebSocket');
+        initializeWebSocket(strapi);
+      } else {
+        console.log('⏳ HTTP сервер еще не готов, повторяем через 500ms');
+        setTimeout(initWebSocketWhenReady, 500);
+      }
+    };
+
+    // Запускаем проверку
+    setTimeout(initWebSocketWhenReady, 2000);
+    
+    console.log('✅ BOOTSTRAP: Bootstrap завершен');
   },
 }; 

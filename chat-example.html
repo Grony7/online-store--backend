@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Пример чата с сохранением истории</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <link rel="stylesheet" href="Chat.css">
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const API_URL = 'http://localhost:1337';
+
+        // Пример пользователя и токена (в реальном приложении это будет получено из аутентификации)
+        const mockUser = {
+            id: 1,
+            username: 'testuser',
+            email: 'test@example.com'
+        };
+        
+        const mockToken = 'your-jwt-token-here'; // Замените на реальный JWT токен
+
+        const Chat = ({ user, authToken }) => {
+            const [messages, setMessages] = useState([]);
+            const [newMessage, setNewMessage] = useState('');
+            const [socket, setSocket] = useState(null);
+            const [isConnected, setIsConnected] = useState(false);
+            const [isLoading, setIsLoading] = useState(true);
+            const messagesEndRef = useRef(null);
+
+            // Автоскролл к последнему сообщению
+            const scrollToBottom = () => {
+                messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            };
+
+            // Загрузка истории сообщений из API
+            const loadMessageHistory = async () => {
+                try {
+                    setIsLoading(true);
+                    const response = await fetch(`${API_URL}/api/messages/user/${user.id}`, {
+                        headers: {
+                            'Authorization': `Bearer ${authToken}`,
+                            'Content-Type': 'application/json',
+                        },
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log('Загружена история сообщений:', data);
+                        setMessages(data.data || []);
+                        
+                        // Сохраняем в localStorage для быстрого доступа
+                        localStorage.setItem(`chat_history_${user.id}`, JSON.stringify(data.data || []));
+                    } else {
+                        console.error('Ошибка загрузки истории сообщений:', response.status);
+                        
+                        // Пытаемся загрузить из localStorage
+                        const cachedMessages = localStorage.getItem(`chat_history_${user.id}`);
+                        if (cachedMessages) {
+                            setMessages(JSON.parse(cachedMessages));
+                        }
+                    }
+                } catch (error) {
+                    console.error('Ошибка при загрузке истории сообщений:', error);
+                    
+                    // Пытаемся загрузить из localStorage при ошибке сети
+                    const cachedMessages = localStorage.getItem(`chat_history_${user.id}`);
+                    if (cachedMessages) {
+                        setMessages(JSON.parse(cachedMessages));
+                    }
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            // Сохранение сообщений в localStorage
+            const saveMessagesToCache = (updatedMessages) => {
+                localStorage.setItem(`chat_history_${user.id}`, JSON.stringify(updatedMessages));
+            };
+
+            // Инициализация WebSocket соединения
+            useEffect(() => {
+                // Сначала загружаем историю сообщений
+                loadMessageHistory();
+
+                // Затем подключаемся к WebSocket
+                const newSocket = io(API_URL, {
+                    auth: {
+                        token: authToken
+                    },
+                    transports: ['websocket', 'polling']
+                });
+
+                newSocket.on('connect', () => {
+                    console.log('Подключение к WebSocket установлено');
+                    setIsConnected(true);
+                    
+                    // Присоединяемся к комнате пользователя
+                    newSocket.emit('join', { userId: user.id });
+                });
+
+                newSocket.on('disconnect', () => {
+                    console.log('WebSocket соединение разорвано');
+                    setIsConnected(false);
+                });
+
+                newSocket.on('newMessage', (message) => {
+                    console.log('Получено новое сообщение:', message);
+                    setMessages(prevMessages => {
+                        const updatedMessages = [...prevMessages, message];
+                        saveMessagesToCache(updatedMessages);
+                        return updatedMessages;
+                    });
+                });
+
+                newSocket.on('messageHistory', (history) => {
+                    console.log('Получена история сообщений через WebSocket:', history);
+                    setMessages(history);
+                    saveMessagesToCache(history);
+                });
+
+                newSocket.on('connect_error', (error) => {
+                    console.error('Ошибка подключения WebSocket:', error);
+                });
+
+                setSocket(newSocket);
+
+                return () => {
+                    newSocket.close();
+                };
+            }, [user.id, authToken]);
+
+            // Автоскролл при новых сообщениях
+            useEffect(() => {
+                scrollToBottom();
+            }, [messages]);
+
+            // Отправка сообщения
+            const sendMessage = async (e) => {
+                e.preventDefault();
+                
+                if (!newMessage.trim() || !socket || !isConnected) {
+                    return;
+                }
+
+                try {
+                    // Отправляем сообщение через REST API для гарантии сохранения
+                    const response = await fetch(`${API_URL}/api/messages`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${authToken}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            data: {
+                                text: newMessage,
+                                isFromSupport: false
+                            }
+                        }),
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log('Сообщение отправлено через API:', data);
+                        
+                        // Также отправляем через WebSocket для мгновенной доставки
+                        socket.emit('message', {
+                            text: newMessage,
+                            userId: user.id,
+                            isFromSupport: false
+                        });
+
+                        setNewMessage('');
+                    } else {
+                        console.error('Ошибка отправки сообщения:', response.status);
+                    }
+                } catch (error) {
+                    console.error('Ошибка при отправке сообщения:', error);
+                }
+            };
+
+            // Принудительное обновление истории
+            const refreshHistory = () => {
+                loadMessageHistory();
+            };
+
+            if (isLoading) {
+                return React.createElement('div', { className: 'chat-container' },
+                    React.createElement('div', { className: 'chat-loading' },
+                        React.createElement('div', { className: 'loading-spinner' }),
+                        React.createElement('p', null, 'Загрузка истории сообщений...')
+                    )
+                );
+            }
+
+            return React.createElement('div', { className: 'chat-container' },
+                React.createElement('div', { className: 'chat-header' },
+                    React.createElement('h3', null, 'Чат поддержки'),
+                    React.createElement('div', { className: 'chat-status' },
+                        React.createElement('span', {
+                            className: `status-indicator ${isConnected ? 'connected' : 'disconnected'}`
+                        }, isConnected ? 'Подключено' : 'Не подключено'),
+                        React.createElement('button', {
+                            onClick: refreshHistory,
+                            className: 'refresh-btn',
+                            title: 'Обновить историю'
+                        }, '⟳')
+                    )
+                ),
+                
+                React.createElement('div', { className: 'chat-messages' },
+                    messages.length === 0
+                        ? React.createElement('div', { className: 'no-messages' },
+                            React.createElement('p', null, 'История сообщений пуста'),
+                            React.createElement('p', null, 'Напишите первое сообщение!')
+                        )
+                        : messages.map((message, index) =>
+                            React.createElement('div', {
+                                key: message.id || index,
+                                className: `message ${message.isFromSupport ? 'support-message' : 'user-message'}`
+                            },
+                                React.createElement('div', { className: 'message-content' },
+                                    React.createElement('p', null, message.text),
+                                    React.createElement('span', { className: 'message-time' },
+                                        new Date(message.createdAt).toLocaleString('ru-RU', {
+                                            day: '2-digit',
+                                            month: '2-digit',
+                                            year: '2-digit',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                        })
+                                    )
+                                ),
+                                message.isFromSupport && React.createElement('div', { className: 'message-author' }, 'Поддержка')
+                            )
+                        ),
+                    React.createElement('div', { ref: messagesEndRef })
+                ),
+
+                React.createElement('form', { onSubmit: sendMessage, className: 'chat-input-form' },
+                    React.createElement('div', { className: 'input-group' },
+                        React.createElement('input', {
+                            type: 'text',
+                            value: newMessage,
+                            onChange: (e) => setNewMessage(e.target.value),
+                            placeholder: 'Введите ваше сообщение...',
+                            className: 'message-input',
+                            disabled: !isConnected
+                        }),
+                        React.createElement('button', {
+                            type: 'submit',
+                            className: 'send-button',
+                            disabled: !isConnected || !newMessage.trim()
+                        }, 'Отправить')
+                    ),
+                    !isConnected && React.createElement('p', { className: 'connection-warning' },
+                        'Соединение отсутствует. Попробуйте обновить страницу.'
+                    )
+                )
+            );
+        };
+
+        // Рендерим приложение
+        const App = () => {
+            return React.createElement('div', null,
+                React.createElement('h1', { style: { textAlign: 'center', margin: '20px 0' } }, 
+                    'Пример чата с сохранением истории'
+                ),
+                React.createElement('div', { style: { margin: '20px auto', maxWidth: '800px' } },
+                    React.createElement('p', { style: { textAlign: 'center', marginBottom: '20px' } },
+                        'Для тестирования замените mockToken на реальный JWT токен от вашего Strapi'
+                    ),
+                    React.createElement(Chat, {
+                        user: mockUser,
+                        authToken: mockToken
+                    })
+                )
+            );
+        };
+
+        ReactDOM.render(React.createElement(App), document.getElementById('root'));
+    </script>
+</body>
+</html> 

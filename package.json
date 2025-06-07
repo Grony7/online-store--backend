@@ -21,14 +21,17 @@
     "@strapi/provider-email-mailgun": "^5.14.0",
     "@strapi/provider-email-nodemailer": "^5.14.0",
     "@strapi/strapi": "5.12.5",
+    "jsonwebtoken": "^9.0.2",
     "nodemailer": "^7.0.3",
     "pg": "8.8.0",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
     "react-router-dom": "^6.0.0",
+    "socket.io": "^4.8.1",
     "styled-components": "^6.0.0"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",

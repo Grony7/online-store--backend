@@ -36,7 +36,7 @@ export default factories.createCoreController(
                     populate: ['preview_image'],
                 });
 
-                console.log('Найденные акции:', JSON.stringify(promotions, null, 2));
+        ;
 
                 // Формируем ответ
                 const data = promotions.map(promo => ({

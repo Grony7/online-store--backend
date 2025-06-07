@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест пользовательского чата</title>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+</head>
+<body>
+    <div style="padding: 20px; font-family: Arial, sans-serif;">
+        <h1>🧪 Тест пользовательского чата</h1>
+        
+        <div style="margin-bottom: 20px;">
+            <label>JWT токен пользователя:</label><br>
+            <input type="text" id="tokenInput" placeholder="Вставьте JWT токен" style="width: 500px; padding: 8px;">
+            <button onclick="connectToChat()" style="padding: 8px 16px; margin-left: 10px;">Подключиться</button>
+        </div>
+        
+        <div id="status" style="margin-bottom: 20px; font-weight: bold;">
+            Статус: ❌ Не подключен
+        </div>
+        
+        <div id="messages" style="height: 300px; border: 1px solid #ccc; padding: 10px; overflow-y: auto; margin-bottom: 20px; background: #f9f9f9;">
+            <div style="color: #666;">Сообщения появятся здесь...</div>
+        </div>
+        
+        <div style="display: flex; gap: 10px;">
+            <input type="text" id="messageInput" placeholder="Введите сообщение..." style="flex: 1; padding: 8px;" disabled>
+            <button onclick="sendMessage()" id="sendBtn" style="padding: 8px 16px;" disabled>Отправить</button>
+            <button onclick="loadHistory()" id="historyBtn" style="padding: 8px 16px;" disabled>Загрузить историю</button>
+        </div>
+        
+        <div style="margin-top: 20px; padding: 15px; background: #f0f8ff; border-radius: 5px;">
+            <strong>📋 Инструкция:</strong>
+            <ol>
+                <li>Скопируйте JWT токен из localStorage вашего фронтенда</li>
+                <li>Вставьте токен в поле выше и нажмите "Подключиться"</li>
+                <li>После успешного подключения пробуйте отправлять сообщения</li>
+                <li>Проверяйте логи в консоли браузера и в терминале Strapi</li>
+            </ol>
+        </div>
+        
+        <div style="margin-top: 15px; padding: 15px; background: #fff3cd; border-radius: 5px;">
+            <strong>🔍 Отладка:</strong><br>
+            Откройте DevTools (F12) → Console для просмотра логов WebSocket соединения
+        </div>
+    </div>
+
+    <script>
+        let socket = null;
+        let isConnected = false;
+
+        function addMessage(text, isSystem = false) {
+            const messagesDiv = document.getElementById('messages');
+            const messageEl = document.createElement('div');
+            messageEl.style.marginBottom = '8px';
+            messageEl.style.padding = '8px';
+            messageEl.style.borderRadius = '8px';
+            
+            if (isSystem) {
+                messageEl.style.background = '#e3f2fd';
+                messageEl.style.color = '#1976d2';
+                messageEl.style.fontStyle = 'italic';
+            } else {
+                messageEl.style.background = '#fff';
+                messageEl.style.border = '1px solid #ddd';
+            }
+            
+            messageEl.innerHTML = `
+                <strong>${new Date().toLocaleTimeString()}:</strong> ${text}
+            `;
+            
+            messagesDiv.appendChild(messageEl);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function updateStatus(status, color) {
+            document.getElementById('status').innerHTML = `Статус: ${status}`;
+            document.getElementById('status').style.color = color;
+        }
+
+        function connectToChat() {
+            const token = document.getElementById('tokenInput').value.trim();
+            
+            if (!token) {
+                alert('Введите JWT токен!');
+                return;
+            }
+
+            console.log('🔌 Подключаемся к WebSocket с токеном:', token.substring(0, 10) + '...');
+            addMessage('🔌 Попытка подключения к WebSocket...', true);
+
+            // Закрываем предыдущее соединение
+            if (socket) {
+                socket.close();
+            }
+
+            socket = io('http://localhost:1337', {
+                auth: { token: token },
+                transports: ['websocket', 'polling']
+            });
+
+            socket.on('connect', () => {
+                console.log('✅ Подключен к WebSocket');
+                isConnected = true;
+                updateStatus('✅ Подключен', 'green');
+                addMessage('✅ Успешно подключен к чату!', true);
+                
+                // Активируем кнопки
+                document.getElementById('messageInput').disabled = false;
+                document.getElementById('sendBtn').disabled = false;
+                document.getElementById('historyBtn').disabled = false;
+                
+                // Отправляем тестовое событие
+                setTimeout(() => {
+                    console.log('🧪 Отправляем тестовое событие');
+                    socket.emit('test', { message: 'тест соединения' });
+                }, 1000);
+            });
+
+            socket.on('disconnect', () => {
+                console.log('❌ Отключен от WebSocket');
+                isConnected = false;
+                updateStatus('❌ Отключен', 'red');
+                addMessage('❌ Отключен от чата', true);
+                
+                // Деактивируем кнопки
+                document.getElementById('messageInput').disabled = true;
+                document.getElementById('sendBtn').disabled = true;
+                document.getElementById('historyBtn').disabled = true;
+            });
+
+            socket.on('newMessage', (message) => {
+                console.log('💬 Новое сообщение:', message);
+                const prefix = message.isFromSupport ? '👨‍💼 Поддержка' : '👤 Вы';
+                addMessage(`${prefix}: ${message.text}`);
+            });
+
+            socket.on('messageHistory', (data) => {
+                console.log('📜 История сообщений:', data);
+                addMessage(`📜 Загружено ${data.messages.length} сообщений из истории`, true);
+                
+                data.messages.forEach(message => {
+                    const prefix = message.isFromSupport ? '👨‍💼 Поддержка' : '👤 Вы';
+                    addMessage(`${prefix}: ${message.text}`);
+                });
+            });
+
+            socket.on('error', (error) => {
+                console.error('❌ WebSocket ошибка:', error);
+                addMessage(`❌ Ошибка: ${error.message || error}`, true);
+            });
+
+            socket.on('test', (data) => {
+                console.log('🧪 Получено тестовое сообщение:', data);
+                addMessage(`🧪 Тест: ${data.message}`, true);
+            });
+
+            socket.on('test-response', (data) => {
+                console.log('🧪 Получен ответ на тест:', data);
+                addMessage(`🧪 Ответ сервера: ${data.message} (ID: ${data.userId})`, true);
+            });
+
+            socket.on('connect_error', (error) => {
+                console.error('❌ Ошибка подключения:', error);
+                addMessage(`❌ Ошибка подключения: ${error.message}`, true);
+                updateStatus('❌ Ошибка подключения', 'red');
+            });
+        }
+
+        function sendMessage() {
+            const messageText = document.getElementById('messageInput').value.trim();
+            
+            if (!messageText || !socket || !isConnected) {
+                console.log('❌ Не могу отправить сообщение');
+                return;
+            }
+
+            console.log('📤 Отправляем сообщение:', messageText);
+            addMessage('📤 Отправляем сообщение...', true);
+
+            socket.emit('message', {
+                text: messageText,
+                isFromSupport: false
+            });
+
+            document.getElementById('messageInput').value = '';
+        }
+
+        function loadHistory() {
+            if (!socket || !isConnected) {
+                console.log('❌ Нет соединения для загрузки истории');
+                return;
+            }
+
+            console.log('📜 Запрашиваем историю сообщений');
+            addMessage('📜 Загружаем историю сообщений...', true);
+            
+            socket.emit('getMessages', {});
+        }
+
+        // Отправка сообщения по Enter
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html> 
